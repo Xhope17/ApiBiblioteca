@@ -11,46 +11,39 @@ namespace ApiBiblioteca.Controllers // <--- CAMBIADO AL NAMESPACE DE TU PROYECTO
     public class AuthController : ControllerBase
     {
         private readonly IConfiguration _configuration;
+        private readonly BibliotecaDbContext _context;
 
-        public AuthController(IConfiguration configuration)
+        public AuthController(IConfiguration configuration, BibliotecaDbContext context)
         {
             _configuration = configuration;
+            _context = context;
         }
 
         [HttpPost("login")]
-        public IActionResult Login([FromBody] LoginModel login)
+        public async Task<IActionResult> Login(LoginModel login)
         {
-            // Simulación Hardcoded
-            UsuarioInfo usuario = null;
+            var bibliotecario = await _context.Bibliotecarios
+                .Include(b => b.IdUsuarioNavigation)
+                .ThenInclude(u => u.IdRolNavigation)
+                .FirstOrDefaultAsync(b =>
+                    b.IdUsuarioNavigation.Correo == login.Username);
 
-            // CASO 1: Es el Admin/Bibliotecario
-            // Asumimos que en tu DB el Bibliotecario tiene ID 1 (lo creamos en el script)
-            if (login.Username == "admin" && login.Password == "1234")
-            {
-                usuario = new UsuarioInfo
-                {
-                    Username = "admin",
-                    Role = "Bibliotecario",
-                    IdBibliotecario = 1 // <--- IMPORTANTE: Esto permite crear préstamos
-                };
-            }
-            // CASO 2: Es un usuario cualquiera (opcional)
-            else if (login.Username == "user" && login.Password == "1234")
-            {
-                usuario = new UsuarioInfo
-                {
-                    Username = "user",
-                    Role = "Cliente",
-                    IdBibliotecario = 0
-                };
-            }
+            if (bibliotecario == null)
+                return Unauthorized("Usuario no encontrado");
 
-            if (usuario == null)
-                return Unauthorized("Credenciales incorrectas");
+            // Validación simple (luego puedes usar hash)
+            if (bibliotecario.PasswordHash != login.Password)
+                return Unauthorized("Contraseña incorrecta");
+
+            var usuario = new UsuarioInfo
+            {
+                Username = bibliotecario.IdUsuarioNavigation.Nombre,
+                Role = bibliotecario.IdUsuarioNavigation.IdRolNavigation.NombreRol,
+                IdBibliotecario = bibliotecario.IdBibliotecario
+            };
 
             var token = GenerateToken(usuario);
 
-            // Devolvemos el token y los datos útiles para el Frontend
             return Ok(new
             {
                 token,
