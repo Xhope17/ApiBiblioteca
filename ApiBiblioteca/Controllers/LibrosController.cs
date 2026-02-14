@@ -1,15 +1,13 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Rendering;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ApiBiblioteca.Models;
+using ApiBiblioteca.DTOs;
 
 namespace ApiBiblioteca.Controllers
 {
-    public class LibrosController : Controller
+    [Route("api/[controller]")]
+    [ApiController]
+    public class LibrosController : ControllerBase
     {
         private readonly BibliotecaDbContext _context;
 
@@ -18,139 +16,42 @@ namespace ApiBiblioteca.Controllers
             _context = context;
         }
 
-        // GET: Libros
-        public async Task<IActionResult> Index()
+        // GET: api/Libros
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<LibroDto>>> GetLibros()
         {
-            return View(await _context.Libros.ToListAsync());
-        }
-
-        // GET: Libros/Details/5
-        public async Task<IActionResult> Details(int? id)
-        {
-            if (id == null)
-            {
-                return NotFound();
-            }
-
-            var libro = await _context.Libros
-                .FirstOrDefaultAsync(m => m.IdLibro == id);
-            if (libro == null)
-            {
-                return NotFound();
-            }
-
-            return View(libro);
-        }
-
-        // GET: Libros/Create
-        public IActionResult Create()
-        {
-            return View();
-        }
-
-        // POST: Libros/Create
-        // To protect from overposting attacks, enable the specific properties you want to bind to.
-        // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create([Bind("IdLibro,Titulo,Autor,Stock,ImagenUrl,FechaIngreso")] Libro libro)
-        {
-            if (ModelState.IsValid)
-            {
-                _context.Add(libro);
-                await _context.SaveChangesAsync();
-                return RedirectToAction(nameof(Index));
-            }
-            return View(libro);
-        }
-
-        // GET: Libros/Edit/5
-        public async Task<IActionResult> Edit(int? id)
-        {
-            if (id == null)
-            {
-                return NotFound();
-            }
-
-            var libro = await _context.Libros.FindAsync(id);
-            if (libro == null)
-            {
-                return NotFound();
-            }
-            return View(libro);
-        }
-
-        // POST: Libros/Edit/5
-        // To protect from overposting attacks, enable the specific properties you want to bind to.
-        // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(int id, [Bind("IdLibro,Titulo,Autor,Stock,ImagenUrl,FechaIngreso")] Libro libro)
-        {
-            if (id != libro.IdLibro)
-            {
-                return NotFound();
-            }
-
-            if (ModelState.IsValid)
-            {
-                try
+            var libros = await _context.Libros
+                .Select(l => new LibroDto // Proyección a DTO
                 {
-                    _context.Update(libro);
-                    await _context.SaveChangesAsync();
-                }
-                catch (DbUpdateConcurrencyException)
-                {
-                    if (!LibroExists(libro.IdLibro))
-                    {
-                        return NotFound();
-                    }
-                    else
-                    {
-                        throw;
-                    }
-                }
-                return RedirectToAction(nameof(Index));
-            }
-            return View(libro);
+                    IdLibro = l.IdLibro,
+                    Titulo = l.Titulo,
+                    Autor = l.Autor,
+                    Stock = l.Stock,
+                    ImagenUrl = l.ImagenUrl
+                }).ToListAsync();
+
+            return Ok(libros);
         }
 
-        // GET: Libros/Delete/5
-        public async Task<IActionResult> Delete(int? id)
+        // POST: api/Libros
+        [HttpPost]
+        public async Task<ActionResult> PostLibro(LibroCreacionDto libroDto)
         {
-            if (id == null)
+            var libro = new Libro
             {
-                return NotFound();
-            }
+                Titulo = libroDto.Titulo,
+                Autor = libroDto.Autor,
+                Stock = libroDto.Stock,
+                ImagenUrl = libroDto.ImagenUrl,
+                FechaIngreso = DateTime.Now
+            };
 
-            var libro = await _context.Libros
-                .FirstOrDefaultAsync(m => m.IdLibro == id);
-            if (libro == null)
-            {
-                return NotFound();
-            }
-
-            return View(libro);
-        }
-
-        // POST: Libros/Delete/5
-        [HttpPost, ActionName("Delete")]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> DeleteConfirmed(int id)
-        {
-            var libro = await _context.Libros.FindAsync(id);
-            if (libro != null)
-            {
-                _context.Libros.Remove(libro);
-            }
-
+            _context.Libros.Add(libro);
             await _context.SaveChangesAsync();
-            return RedirectToAction(nameof(Index));
+
+            return Ok(new { mensaje = "Libro creado", id = libro.IdLibro });
         }
 
-        private bool LibroExists(int id)
-        {
-            return _context.Libros.Any(e => e.IdLibro == id);
-        }
+        // Aquí podrías agregar PUT y DELETE siguiendo el mismo patrón...
     }
 }

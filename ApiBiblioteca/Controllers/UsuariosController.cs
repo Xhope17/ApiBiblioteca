@@ -1,21 +1,13 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-
-
-using ApiBiblioteca.DTOs;
-using ApiBiblioteca.Models;
-using Humanizer.Localisation;
-using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+using ApiBiblioteca.Models;
+using ApiBiblioteca.DTOs;
 
 namespace ApiBiblioteca.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class UsuariosController : Controller
+    public class UsuariosController : ControllerBase
     {
         private readonly BibliotecaDbContext _context;
 
@@ -24,80 +16,74 @@ namespace ApiBiblioteca.Controllers
             _context = context;
         }
 
-        // GET: Usuarios
+        // GET: api/Usuarios
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Usuario>>> getUsuarios()
+        public async Task<ActionResult<IEnumerable<UsuarioDto>>> GetUsuarios()
         {
-            return await _context.Usuarios.ToListAsync();
-        }
-
-
-        [HttpGet("{id}")]
-        public async Task<ActionResult<UsuarioDto>> GetUsuario(int id)
-        {
-            var usuario = await _context.Usuarios
+            var usuarios = await _context.Usuarios
                 .Include(u => u.IdRolNavigation)
-                .Where(u => u.IdUsuario == id)
-                .Select(u => new UsuarioDto
+                .Select(u => new UsuarioDto // Aquí llenamos el DTO actualizado
                 {
                     IdUsuario = u.IdUsuario,
                     Cedula = u.Cedula,
-                    Nombre = u.Nombre,
-                    Apellido = u.Apellido,
+                    Nombre = u.Nombre,       // Ahora sí existe en el DTO
+                    Apellido = u.Apellido,   // Ahora sí existe en el DTO
                     NombreCompleto = $"{u.Nombre} {u.Apellido}",
                     Correo = u.Correo,
                     Rol = u.IdRolNavigation.NombreRol,
                     FechaRegistro = u.FechaRegistro
-                })
-                .FirstOrDefaultAsync();
+                }).ToListAsync();
 
-            if (usuario == null) return NotFound();
-
-            return Ok(usuario);
+            return Ok(usuarios);
         }
 
-
-
-        [HttpPut("{id}")]
-        //[Authorize(Roles = "Admin")] // Solo usuarios con roles Admin pueden acceder
-        public async Task<IActionResult> PutUsuario(int id, Usuario usuario)
+        // POST: api/Usuarios
+        [HttpPost]
+        public async Task<ActionResult> PostUsuario(UsuarioCreacionDto usuarioDto)
         {
-            if (id != usuario.IdUsuario)
-            {
-                return BadRequest();
-            }
-            _context.Entry(usuario).State = EntityState.Modified;
+            if (await _context.Usuarios.AnyAsync(u => u.Cedula == usuarioDto.Cedula))
+                return BadRequest("La cédula ya existe.");
+
+            using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
+                // 1. Crear Usuario Base
+                var usuario = new Usuario
+                {
+                    Cedula = usuarioDto.Cedula,
+                    Nombre = usuarioDto.Nombre,
+                    Apellido = usuarioDto.Apellido,
+                    Correo = usuarioDto.Correo,
+                    IdRol = usuarioDto.IdRol,
+                    FechaRegistro = DateTime.Now
+                };
+
+                _context.Usuarios.Add(usuario);
                 await _context.SaveChangesAsync();
+
+                // 2. Si es Bibliotecario (Rol 1), guardar credenciales
+                if (usuarioDto.IdRol == 1)
+                {
+                    if (string.IsNullOrEmpty(usuarioDto.Password))
+                        throw new Exception("El bibliotecario requiere contraseña.");
+
+                    var biblio = new Bibliotecario
+                    {
+                        IdUsuario = usuario.IdUsuario,
+                        PasswordHash = usuarioDto.Password
+                    };
+                    _context.Bibliotecarios.Add(biblio);
+                    await _context.SaveChangesAsync();
+                }
+
+                await transaction.CommitAsync();
+                return Ok(new { mensaje = "Usuario registrado correctamente", id = usuario.IdUsuario });
             }
-            catch (DbUpdateConcurrencyException)
+            catch (Exception ex)
             {
-                if (!UsuarioExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
+                await transaction.RollbackAsync();
+                return BadRequest(ex.Message);
             }
-            return NoContent();
-        }
-
-
-        [HttpPost]
-        public async Task<ActionResult<Usuario>> PostUsuario(Usuario usuario)
-        {
-            _context.Usuarios.Add(usuario);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction("GetUsuario", new { id = usuario.IdUsuario }, usuario);
-        }
-
-        private bool UsuarioExists(int id)
-        {
-            return _context.Usuarios.Any(e => e.IdUsuario == id);
         }
     }
 }

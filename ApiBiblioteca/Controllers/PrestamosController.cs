@@ -1,11 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ApiBiblioteca.Models;
+using ApiBiblioteca.DTOs;
 
 namespace ApiBiblioteca.Controllers
 {
@@ -22,86 +18,71 @@ namespace ApiBiblioteca.Controllers
 
         // GET: api/Prestamos
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Prestamo>>> GetPrestamos()
+        public async Task<ActionResult<IEnumerable<PrestamoDto>>> GetPrestamos()
         {
-            return await _context.Prestamos.ToListAsync();
-        }
-
-        // GET: api/Prestamos/5
-        [HttpGet("{id}")]
-        public async Task<ActionResult<Prestamo>> GetPrestamo(int id)
-        {
-            var prestamo = await _context.Prestamos.FindAsync(id);
-
-            if (prestamo == null)
-            {
-                return NotFound();
-            }
-
-            return prestamo;
-        }
-
-        // PUT: api/Prestamos/5
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPut("{id}")]
-        public async Task<IActionResult> PutPrestamo(int id, Prestamo prestamo)
-        {
-            if (id != prestamo.IdPrestamo)
-            {
-                return BadRequest();
-            }
-
-            _context.Entry(prestamo).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!PrestamoExists(id))
+            var prestamos = await _context.Prestamos
+                .Include(p => p.IdUsuarioNavigation)
+                .Include(p => p.IdLibroNavigation)
+                .Include(p => p.IdBibliotecarioNavigation)
+                    .ThenInclude(b => b.IdUsuarioNavigation)
+                .Select(p => new PrestamoDto
                 {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
+                    IdPrestamo = p.IdPrestamo,
+                    Cliente = $"{p.IdUsuarioNavigation.Nombre} {p.IdUsuarioNavigation.Apellido}",
+                    Libro = p.IdLibroNavigation.Titulo,
+                    AtendidoPor = p.IdBibliotecarioNavigation.IdUsuarioNavigation.Nombre,
+                    FechaPrestamo = p.FechaPrestamo,
+                    FechaDevolucion = p.FechaDevolucion,
+                    Estado = p.Estado
+                }).ToListAsync();
 
-            return NoContent();
+            return Ok(prestamos);
         }
 
-        // POST: api/Prestamos
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
+        // POST: api/Prestamos (RESTA STOCK)
         [HttpPost]
-        public async Task<ActionResult<Prestamo>> PostPrestamo(Prestamo prestamo)
+        public async Task<ActionResult> PostPrestamo(PrestamoCreacionDto dto)
         {
+            var libro = await _context.Libros.FindAsync(dto.IdLibro);
+
+            if (libro == null) return NotFound("Libro no existe.");
+            if (libro.Stock <= 0) return BadRequest("No hay stock disponible.");
+
+            // LOGICA CRITICA: Restar Stock
+            libro.Stock -= 1;
+
+            var prestamo = new Prestamo
+            {
+                IdUsuario = dto.IdUsuario,
+                IdLibro = dto.IdLibro,
+                IdBibliotecario = dto.IdBibliotecario, // En el futuro vendrá del Token JWT
+                FechaPrestamo = DateTime.Now,
+                Estado = "Activo"
+            };
+
             _context.Prestamos.Add(prestamo);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction("GetPrestamo", new { id = prestamo.IdPrestamo }, prestamo);
+            return Ok(new { mensaje = "Préstamo registrado", nuevoStock = libro.Stock });
         }
 
-        // DELETE: api/Prestamos/5
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeletePrestamo(int id)
+        // PUT: api/Prestamos/Devolver/5 (SUMA STOCK)
+        [HttpPut("Devolver/{id}")]
+        public async Task<IActionResult> Devolver(int id)
         {
             var prestamo = await _context.Prestamos.FindAsync(id);
-            if (prestamo == null)
-            {
-                return NotFound();
-            }
+            if (prestamo == null) return NotFound();
+            if (prestamo.Estado == "Devuelto") return BadRequest("Ya fue devuelto.");
 
-            _context.Prestamos.Remove(prestamo);
+            // LOGICA CRITICA: Sumar Stock
+            var libro = await _context.Libros.FindAsync(prestamo.IdLibro);
+            if (libro != null) libro.Stock += 1;
+
+            prestamo.Estado = "Devuelto";
+            prestamo.FechaDevolucion = DateTime.Now;
+
             await _context.SaveChangesAsync();
-
-            return NoContent();
-        }
-
-        private bool PrestamoExists(int id)
-        {
-            return _context.Prestamos.Any(e => e.IdPrestamo == id);
+            return Ok(new { mensaje = "Devolución exitosa" });
         }
     }
 }
