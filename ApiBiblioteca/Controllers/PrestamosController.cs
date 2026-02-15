@@ -18,23 +18,45 @@ namespace ApiBiblioteca.Controllers
 
         // GET: api/Prestamos
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<PrestamoDto>>> GetPrestamos()
+        public async Task<ActionResult<IEnumerable<object>>> GetPrestamos()
         {
+            // Verificamos que no sea nulo
+            if (_context.Prestamos == null)
+            {
+                return NotFound();
+            }
+
             var prestamos = await _context.Prestamos
-                .Include(p => p.IdUsuarioNavigation)
+                // 1. Incluimos las relaciones (Los nombres pueden variar según tu scaffolding)
                 .Include(p => p.IdLibroNavigation)
-                .Include(p => p.IdBibliotecarioNavigation)
-                    .ThenInclude(b => b.IdUsuarioNavigation)
-                .Select(p => new PrestamoDto
+                .Include(p => p.IdUsuarioNavigation)
+                // 2. Hacemos una proyección para darles el formato 
+                .Select(p => new
                 {
-                    IdPrestamo = p.IdPrestamo,
-                    Cliente = $"{p.IdUsuarioNavigation.Nombre} {p.IdUsuarioNavigation.Apellido}",
-                    Libro = p.IdLibroNavigation.Titulo,
-                    AtendidoPor = p.IdBibliotecarioNavigation.IdUsuarioNavigation.Nombre,
-                    FechaPrestamo = p.FechaPrestamo,
-                    FechaDevolucion = p.FechaDevolucion,
-                    Estado = p.Estado
-                }).ToListAsync();
+                    idPrestamo = p.IdPrestamo,
+                    fechaPrestamo = p.FechaPrestamo,
+                    fechaDevolucion = p.FechaDevolucion,
+                    idLibro = p.IdLibro,
+                    idUsuario = p.IdUsuario,
+
+                    // Objeto que espera el frontend para mostrar el libro
+                    libro = new
+                    {
+                        titulo = p.IdLibroNavigation.Titulo,
+                        autor = p.IdLibroNavigation.Autor,
+                        imagenUrl = p.IdLibroNavigation.ImagenUrl
+                    },
+
+                    // información del usuario
+                    usuario = new
+                    {
+                        nombre = p.IdUsuarioNavigation.Nombre,
+                        apellido = p.IdUsuarioNavigation.Apellido,
+                        cedula = p.IdUsuarioNavigation.Cedula
+                    }
+                })
+                .OrderByDescending(p => p.fechaPrestamo) // Opcional: Los más recientes primero
+                .ToListAsync();
 
             return Ok(prestamos);
         }
