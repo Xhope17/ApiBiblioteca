@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using ApiBiblioteca.Models;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -52,6 +54,7 @@ namespace ApiBiblioteca.Controllers // <--- CAMBIADO AL NAMESPACE DE TU PROYECTO
                 idBibliotecario = usuario.IdBibliotecario
             });
         }
+
 
         private string GenerateToken(UsuarioInfo usuario)
         {
