@@ -15,6 +15,6 @@
     {
         public int IdUsuario { get; set; }       // Cliente
         public int IdLibro { get; set; }         // Libro
-        public int IdBibliotecario { get; set; } // Quién atiende (lo sacarás del Login después)
+        public int IdBibliotecario { get; set; } // Quién atiende
     }
 }

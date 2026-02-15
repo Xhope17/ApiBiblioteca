@@ -15,7 +15,6 @@ builder.Services.AddControllers().AddJsonOptions(options =>
 });
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
-//builder.Services.AddSwaggerGen();
 
 builder.Services.AddDbContext<BibliotecaDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
@@ -63,7 +62,7 @@ builder.Services.AddAuthorization();
 //fin agregado jwt
 
 
-// Configuración de Swagger para JWT (opcional pero recomendado)
+// Configuración de Swagger para JWT
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo { Title = "API Biblioteca", Version = "v1" });
@@ -107,8 +106,8 @@ app.UseCors("AllowAngular");
 app.UseAuthentication();
 //fin agregado
 
-app.UseAuthorization(); //
+app.UseAuthorization();
 
-app.MapControllers(); //
+app.MapControllers();
 
-app.Run(); //
+app.Run();

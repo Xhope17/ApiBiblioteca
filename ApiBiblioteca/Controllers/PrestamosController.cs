@@ -27,10 +27,8 @@ namespace ApiBiblioteca.Controllers
             }
 
             var prestamos = await _context.Prestamos
-                // 1. Incluimos las relaciones (Los nombres pueden variar según tu scaffolding)
                 .Include(p => p.IdLibroNavigation)
                 .Include(p => p.IdUsuarioNavigation)
-                // 2. Hacemos una proyección para darles el formato 
                 .Select(p => new
                 {
                     idPrestamo = p.IdPrestamo,
@@ -55,7 +53,7 @@ namespace ApiBiblioteca.Controllers
                         cedula = p.IdUsuarioNavigation.Cedula
                     }
                 })
-                .OrderByDescending(p => p.fechaPrestamo) // Opcional: Los más recientes primero
+                .OrderByDescending(p => p.fechaPrestamo)
                 .ToListAsync();
 
             return Ok(prestamos);
@@ -70,14 +68,14 @@ namespace ApiBiblioteca.Controllers
             if (libro == null) return NotFound("Libro no existe.");
             if (libro.Stock <= 0) return BadRequest("No hay stock disponible.");
 
-            // LOGICA CRITICA: Restar Stock
+            // Restar Stock
             libro.Stock -= 1;
 
             var prestamo = new Prestamo
             {
                 IdUsuario = dto.IdUsuario,
                 IdLibro = dto.IdLibro,
-                IdBibliotecario = dto.IdBibliotecario, // En el futuro vendrá del Token JWT
+                IdBibliotecario = dto.IdBibliotecario,
                 FechaPrestamo = DateTime.Now,
                 Estado = "Activo"
             };
@@ -96,7 +94,7 @@ namespace ApiBiblioteca.Controllers
             if (prestamo == null) return NotFound();
             if (prestamo.Estado == "Devuelto") return BadRequest("Ya fue devuelto.");
 
-            // LOGICA CRITICA: Sumar Stock
+            // Sumar Stock
             var libro = await _context.Libros.FindAsync(prestamo.IdLibro);
             if (libro != null) libro.Stock += 1;
 

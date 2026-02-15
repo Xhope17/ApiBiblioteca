@@ -6,7 +6,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 
-namespace ApiBiblioteca.Controllers // <--- CAMBIADO AL NAMESPACE DE TU PROYECTO
+namespace ApiBiblioteca.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
@@ -33,7 +33,7 @@ namespace ApiBiblioteca.Controllers // <--- CAMBIADO AL NAMESPACE DE TU PROYECTO
             if (bibliotecario == null)
                 return Unauthorized("Usuario no encontrado");
 
-            // Validación simple (luego puedes usar hash)
+            // Validación simple
             if (bibliotecario.PasswordHash != login.Password)
                 return Unauthorized("Contraseña incorrecta");
 
@@ -58,7 +58,7 @@ namespace ApiBiblioteca.Controllers // <--- CAMBIADO AL NAMESPACE DE TU PROYECTO
 
         private string GenerateToken(UsuarioInfo usuario)
         {
-            // Leemos la configuración del appsettings.json
+            // configuración del appsettings.json
             var jwtSettings = _configuration.GetSection("JwtSettings");
             var keyString = jwtSettings.GetValue<string>("Key");
             var issuer = jwtSettings.GetValue<string>("Issuer");
@@ -72,7 +72,7 @@ namespace ApiBiblioteca.Controllers // <--- CAMBIADO AL NAMESPACE DE TU PROYECTO
             {
                 new Claim(ClaimTypes.Name, usuario.Username),
                 new Claim(ClaimTypes.Role, usuario.Role),
-                // Guardamos el ID en el token para usarlo luego
+                // Guardamos el ID en el token
                 new Claim("IdBibliotecario", usuario.IdBibliotecario.ToString())
             };
 
@@ -87,7 +87,6 @@ namespace ApiBiblioteca.Controllers // <--- CAMBIADO AL NAMESPACE DE TU PROYECTO
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
 
-        // Clases internas para que no te den error
         public class LoginModel
         {
             public string Username { get; set; }
